@@ -69,7 +69,7 @@ st.markdown("""
         margin-top: 25px;
     }
     
-    /* สไตล์ปุ่มกด Complete เควส */
+    /* สไตล์ปุ่มกด Complete เเควส */
     .stButton > button {
         width: 100%;
         border-radius: 6px;
@@ -192,12 +192,11 @@ st.markdown('<div class="system-title">DAILY TASKS</div>', unsafe_allow_html=Tru
 st.markdown('<div class="system-subtitle">CHALLENGE YOUR LIMITS TO GROW</div>', unsafe_allow_html=True)
 st.markdown('<div class="info-header">ℹ️ QUEST INFO (MULTIPLIER SYSTEM)</div>', unsafe_allow_html=True)
 
-# ลูปแสดงรายการเควสทั้งหมด (ทั้งเควสเริ่มต้น และเควสที่คุณสองเพิ่มเข้าไปเอง)
+# ลูปแสดงรายการเควสทั้งหมด
 for i, q in enumerate(st.session_state.quests):
     col_q_text, col_q_input, col_q_btn = st.columns([2.2, 1.3, 1.2])
     
     with col_q_text:
-        # แสดงชื่อเควส และบอกเรทการคำนวณ EXP ให้ผู้เล่นรู้ชัดเจน
         st.markdown(f"""
         <div style='margin-top: 25px;'>
             <p style='font-size:16px; font-weight:bold; margin-bottom:2px;'>{q['name']}</p>
@@ -206,25 +205,24 @@ for i, q in enumerate(st.session_state.quests):
         """, unsafe_allow_html=True)
         
     with col_q_input:
-        # ช่องให้กรอกจำนวนครั้ง/จำนวนหน่วย ได้เองอิสระตามใจชอบ
         count = st.number_input(f"จำนวน ({q['unit']})", min_value=0, value=0, step=1, key=f"input_{i}")
         
     with col_q_btn:
-        # ปุ่มกดส่งเพื่อคำนวณ EXP สุทธิ
-        if st.button("RECORD", key=f"btn_{i}"):
+        # อัปเดตคำบนปุ่มจาก RECORD เป็น COMPLETE เรียบร้อยครับ
+        if st.button("COMPLETE", key=f"btn_{i}"):
             if count > 0:
                 gained_exp = count * q['exp_per_unit']
                 add_reward(gained_exp)
-                st.toast(f"บันทึกสำเร็จ! ทำไป {count} {q['unit']} ได้รับ {gained_exp} EXP 🔥")
+                st.toast(f"Quest Complete! ทำไป {count} {q['unit']} ได้รับ {gained_exp} EXP 🔥")
                 st.rerun()
             else:
-                st.toast("กรุณาใส่จำนวนก่อนกดบันทึกด้วยครับ!", icon="⚠️")
+                st.toast("กรุณาใส่จำนวนก่อนกดปุ่มด้วยครับ!", icon="⚠️")
 
-# ข้อความแจ้งเตือนบทลงโทษท้ายหน้าต่างเควสตามต้นฉบับอนิเมะ
+# ข้อความแจ้งเตือนบทลงโทษท้ายหน้าต่างเควส
 st.markdown("""
 <div class="penalty-warning">
     ⚠️ WARNING: FAILURE TO COMPLETE THE DAILY QUEST WILL RESULT IN AN APPROPRIATE PENALTY.
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown('</div>', unsafe_allow_html=True) # ปิดกล่องหน้าต่างเควส
+st.markdown('</div>', unsafe_allow_html=True)
