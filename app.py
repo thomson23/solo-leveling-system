@@ -26,10 +26,10 @@ def load_player_data(player_name):
 def save_player_data(player_name, level, exp):
     requests.get(f"{API_URL}?action=set&player={player_name}&level={int(level)}&exp={int(exp)}")
 
-# --- ฟังก์ชันข้อมูลเควส ---
-def load_quests():
+# --- ฟังก์ชันข้อมูลเควส (แก้ไข: รับพารามิเตอร์ player_name) ---
+def load_quests(player_name):
     try:
-        res = requests.get(f"{API_URL}?action=get_quests")
+        res = requests.get(f"{API_URL}?action=get_quests&player={player_name}")
         return res.json() if res.status_code == 200 else []
     except:
         return []
@@ -59,8 +59,9 @@ with st.sidebar:
         
         if st.form_submit_button("บันทึกเควสใหม่"):
             if new_name:
+                # แก้ไข: ส่ง current_player ไปด้วย
                 try:
-                    requests.get(f"{API_URL}?action=add_quest&name={new_name}&exp={new_exp}&unit={new_unit}")
+                    requests.get(f"{API_URL}?action=add_quest&player={current_player}&name={new_name}&exp={new_exp}&unit={new_unit}")
                     st.toast("เพิ่มเควสเรียบร้อยแล้ว!")
                     st.rerun() 
                 except:
@@ -85,28 +86,25 @@ progress = min(st.session_state.exp / st.session_state.max_exp, 1.0)
 st.progress(progress)
 st.markdown(f"**EXP:** {int(st.session_state.exp)} / {int(st.session_state.max_exp)} (ขาดอีก {int(st.session_state.max_exp - st.session_state.exp)} จะเลเวลอัป!)")
 
-# --- ส่วนแสดงรายการเควส (ที่ปรับปรุงการจัดตำแหน่ง) ---
+# --- ส่วนแสดงรายการเควส ---
 st.markdown("### 📜 DAILY TASKS")
-quests = load_quests()
+# แก้ไข: ส่ง current_player เข้าไปดึงเควส
+quests = load_quests(current_player)
 
 if quests:
     for i, q in enumerate(quests):
-        # ใช้ vertical_alignment="center" เพื่อให้ชื่อเควสและปุ่มอยู่แนวเดียวกัน
         col1, col2, col3 = st.columns([5, 2, 2], vertical_alignment="center")
         
         with col1:
             st.write(f"**{q['name']}** (+{q['exp_per_unit']} EXP)")
-        
         with col2:
             count = st.number_input(f" ", min_value=0, key=f"input_{i}", label_visibility="collapsed")
-            
         with col3:
             if st.button("COMPLETE", key=f"btn_{i}"):
                 if count > 0:
                     gained = count * int(q['exp_per_unit'])
                     st.session_state.exp += gained
                     
-                    # ตรรกะเลเวลอัปแบบต่อเนื่อง
                     while st.session_state.exp >= st.session_state.max_exp:
                         st.session_state.exp -= st.session_state.max_exp
                         st.session_state.level += 1
@@ -116,4 +114,4 @@ if quests:
                     st.toast(f"ได้รับ {gained} EXP! 🔥")
                     st.rerun()
 else:
-    st.info("ไม่พบเควสในระบบ หรือกำลังโหลดข้อมูล...")
+    st.info(f"ไม่พบเควสสำหรับ {current_player} เพิ่มเควสจากแถบด้านข้างได้เลยครับ!")
