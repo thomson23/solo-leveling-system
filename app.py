@@ -4,7 +4,7 @@ import requests
 # ตั้งค่าหน้าจอ
 st.set_page_config(page_title="Solo Leveling System", page_icon="⚔️", layout="centered")
 
-# [สไตล์ CSS ของเดิมของคุณหมั่น ให้ใส่ไว้ที่นี่เหมือนเดิมครับ]
+# --- CSS Design ---
 st.markdown("""
 <style>
     .stApp { background-color: #060810; color: #ffffff; }
@@ -13,10 +13,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ดึง URL จาก Secrets
 API_URL = st.secrets["connections"]["gsheets"]["spreadsheet"]
 
-# --- ฟังก์ชันจัดการข้อมูล ---
+# --- ฟังก์ชันข้อมูลผู้เล่น ---
 def load_player_data(player_name):
     try:
         res = requests.get(f"{API_URL}?action=get&player={player_name}")
@@ -27,41 +26,63 @@ def load_player_data(player_name):
 def save_player_data(player_name, level, exp):
     requests.get(f"{API_URL}?action=set&player={player_name}&level={int(level)}&exp={int(exp)}")
 
-# --- โหลดรายชื่อปาร์ตี้ ---
+# --- ฟังก์ชันข้อมูลเควส ---
+def load_quests():
+    try:
+        res = requests.get(f"{API_URL}?action=get_quests")
+        return res.json() if res.status_code == 200 else []
+    except:
+        return []
+
+# --- ระบบปาร์ตี้ ---
 if 'players' not in st.session_state:
     st.session_state.players = ["หมั่น", "บีม", "ผู้เล่น 3", "ผู้เล่น 4", "ผู้เล่น 5", "ผู้เล่น 6", "ผู้เล่น 7", "ผู้เล่น 8"]
 
-# --- แถบข้าง (Sidebar) ---
 with st.sidebar:
     st.markdown("### 👥 PARTY SETTINGS")
     current_player = st.selectbox("เลือกผู้เล่น", st.session_state.players)
     
-    # ปุ่มเปลี่ยนชื่อผู้เล่น
     with st.expander("📝 เปลี่ยนชื่อสมาชิก"):
         with st.form("rename_form"):
             new_name = st.text_input("ชื่อใหม่สำหรับ " + current_player)
-            if st.form_submit_button("ยืนยันการเปลี่ยนชื่อ"):
+            if st.form_submit_button("ยืนยัน"):
                 idx = st.session_state.players.index(current_player)
                 st.session_state.players[idx] = new_name
                 st.rerun()
 
-# --- ซิงค์ข้อมูลผู้เล่นที่เลือก ---
-if 'current_active' != current_player:
+# --- ซิงค์ข้อมูล ---
+if 'current_active' not in st.session_state or st.session_state.current_active != current_player:
     st.session_state.current_active = current_player
     data = load_player_data(current_player)
     st.session_state.level = int(data.get('level', 1))
     st.session_state.exp = int(data.get('exp', 0))
 
-# คำนวณ EXP ที่ต้องใช้
 st.session_state.max_exp = 100 * (1.5 ** (st.session_state.level - 1))
 
-# --- แสดงผลหน้าหลัก ---
+# --- หน้าจอหลัก ---
 st.markdown(f"<h3 style='color: #00f2ff;'>👤 {current_player} (LVL: {st.session_state.level})</h3>", unsafe_allow_html=True)
 
-# แถบแสดง EXP
+# แถบ EXP
 progress = min(st.session_state.exp / st.session_state.max_exp, 1.0)
 st.progress(progress)
 st.markdown(f"**EXP:** {int(st.session_state.exp)} / {int(st.session_state.max_exp)} (ขาดอีก {int(st.session_state.max_exp - st.session_state.exp)} จะเลเวลอัป!)")
 
-# ปุ่มเควส (เหมือนเดิม)
-# ... [ใส่โค้ดแสดงรายการเควสของคุณไว้ตรงนี้] ...
+# --- ลูปแสดงรายการเควส ---
+st.markdown("### 📜 DAILY TASKS")
+quests = load_quests()
+for i, q in enumerate(quests):
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        st.write(f"**{q['name']}** (+{q['exp_per_unit']} EXP)")
+    with col2:
+        count = st.number_input(f"จำนวน", min_value=0, key=f"input_{i}")
+    with col3:
+        if st.button("COMPLETE", key=f"btn_{i}"):
+            gained = count * q['exp_per_unit']
+            st.session_state.exp += gained
+            # ถ้า EXP เกิน จะเพิ่มเลเวล (ตรรกะง่ายๆ)
+            if st.session_state.exp >= st.session_state.max_exp:
+                st.session_state.level += 1
+                st.session_state.exp = 0
+            save_player_data(current_player, st.session_state.level, st.session_state.exp)
+            st.rerun()
