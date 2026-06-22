@@ -1,13 +1,13 @@
 import streamlit as st
 import pandas as pd
-import gspread
+from streamlit_gsheets import GSheetsConnection
 
 # 1. ตั้งค่าหน้าจอและดีไซน์ (Glassmorphic & Neon Theme)
 st.set_page_config(page_title="Solo Leveling System", page_icon="⚔️", layout="centered")
 
 st.markdown("""
 <style>
-    /* พื้นหลังโทนดาร์กสุดเท่ */
+    /* พื้นหลังโทนดาร์ก */
     .stApp {
         background-color: #0e1117;
         color: #ffffff;
@@ -21,7 +21,7 @@ st.markdown("""
         padding: 5px;
     }
 
-    /* ขยายฟอนต์เควสให้ใหญ่สะใจ อ่านง่ายบนโทรศัพท์ */
+    /* ขยายฟอนต์เควสให้ใหญ่ อ่านง่ายบนโทรศัพท์ */
     .quest-title {
         font-size: 26px !important;
         font-weight: bold;
@@ -60,7 +60,7 @@ st.markdown("""
         height: 42px !important;
     }
 
-    /* ค่าเลเวลขนาดใหญ่ยักษ์ */
+    /* ค่าเลเวลขนาดใหญ่ */
     div[data-testid="stMetricValue"] {
         font-size: 55px !important;
         color: #00f2ff !important;
@@ -68,26 +68,34 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 2. ฟังก์ชันโหลดข้อมูลจาก Google Sheets ด้วยวิธีแปลงลิงก์อ่านผ่าน DataFrame (เสถียรสุดบนคลาวด์)
-@st.cache_data(ttl=0)
-def load_data_from_sheets(sheet_url):
+# 2. เปิดการเชื่อมต่อ Google Sheets ผ่าน st.connection ตรงๆ
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# ฟังก์ชันดึงค่าจาก Google Sheets
+def load_data_from_sheets():
     try:
-        csv_url = sheet_url.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=save_state')
-        df = pd.read_csv(csv_url)
+        df = conn.read(worksheet="save_state", ttl=0) # ttl=0 เพื่อให้อ่านค่าล่าสุดเสมอ
         data_dict = dict(zip(df['key'], df['value']))
         return data_dict
     except:
         return None
 
-# ดึงลิงก์ตารางจากระบบความลับ Secrets
-try:
-    SHEET_URL = st.secrets["connections"]["gsheets"]["spreadsheet"]
-except:
-    SHEET_URL = ""
+# ฟังก์ชันบันทึกค่ากลับไปยัง Google Sheets (รอบนี้ใส่โค้ดบันทึกของจริงแล้วครับ)
+def save_data_to_sheets(level, exp):
+    try:
+        # เตรียมโครงสร้างตาราง DataFrame ให้เหมือนใน Google Sheets
+        save_df = pd.DataFrame([
+            {"key": "level", "value": int(level)},
+            {"key": "exp", "value": int(exp)}
+        ])
+        # สั่งอัปเดตข้อมูลทับลงในชีตชื่อ save_state ทันที
+        conn.update(worksheet="save_state", data=save_df)
+    except Exception as e:
+        st.error(f"ระบบบันทึกขัดข้อง: {e}")
 
 # --- เริ่มการโหลดข้อมูลตอนเข้าแอป ---
 if 'level' not in st.session_state:
-    sheets_data = load_data_from_sheets(SHEET_URL)
+    sheets_data = load_data_from_sheets()
     
     if sheets_data and 'level' in sheets_data:
         st.session_state.level = int(sheets_data['level'])
@@ -99,17 +107,15 @@ if 'level' not in st.session_state:
     st.session_state.max_exp = 100 * (1.5 ** (st.session_state.level - 1))
     st.session_state.stats = {"STR": 10, "VIT": 10, "AGI": 10, "INT": 10, "MND": 10}
 
-# ฟังก์ชันบันทึกข้อมูลแบบด่วน (สำหรับแชร์ชั่วคราว)
-def save_data(level, exp):
-    # ในสเตปถัดไปหากต้องการแก้ไขเขียนกลับ สามารถเพิ่มสิทธิ์การเขียน Service Account ได้
-    pass
-
 def add_reward(stat_name, stat_val, exp_reward):
     st.session_state.exp += exp_reward
     while st.session_state.exp >= st.session_state.max_exp:
         st.session_state.exp -= st.session_state.max_exp
         st.session_state.level += 1
         st.session_state.max_exp *= 1.5
+    
+    # เรียกใช้ฟังก์ชันเซฟข้อมูลลง Google Sheets ทุกครั้งที่มีการส่งเควสสำเร็จ
+    save_data_to_sheets(st.session_state.level, st.session_state.exp)
 
 # --- โครงสร้างหน้าจอหลัก ---
 st.markdown("<h1 style='text-align: center; color: #00f2ff;'>SYSTEM : SOLO LEVELING</h1>", unsafe_allow_html=True)
@@ -124,7 +130,7 @@ with col2:
 
 st.markdown("---")
 
-# รายการเควสหลักประจำวัน ขนาดตัวหนังสือใหญ่เบิ้ม
+# รายการเควสประจำวัน
 quests = [
     {"name": "🏋️ Push-Ups (วิดพื้น)", "unit": "ครั้ง", "stat": "STR", "val": 0.2, "exp": 2},
     {"name": "🏃 Running (วิ่ง)", "unit": "กิโลเมตร", "stat": "AGI", "val": 5.0, "exp": 50},
@@ -147,7 +153,7 @@ for i, q in enumerate(quests):
             st.write("") 
             if st.button(f"COMPLETE (+{exp_gain} XP)", key=f"btn_{i}"):
                 add_reward(q['stat'], q['val'] * count, exp_gain)
-                st.success("SUCCESSFULLY RECORDED!")
+                st.success("SAVED TO GOOGLE SHEETS!")
                 st.rerun()
     st.write("") 
 
@@ -161,7 +167,8 @@ with st.sidebar:
         st.session_state.level = 1
         st.session_state.exp = 0
         st.session_state.max_exp = 100
+        save_data_to_sheets(1, 0)
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown("---")
-    st.caption("Solo Leveling Glass UI v2.5")
+    st.caption("Solo Leveling Glass UI v3.0")
