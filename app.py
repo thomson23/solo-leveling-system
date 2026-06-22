@@ -26,7 +26,7 @@ def load_player_data(player_name):
 def save_player_data(player_name, level, exp):
     requests.get(f"{API_URL}?action=set&player={player_name}&level={int(level)}&exp={int(exp)}")
 
-# --- ฟังก์ชันข้อมูลเควส (แก้ไข: รับพารามิเตอร์ player_name) ---
+# --- ฟังก์ชันข้อมูลเควส ---
 def load_quests(player_name):
     try:
         res = requests.get(f"{API_URL}?action=get_quests&player={player_name}")
@@ -59,7 +59,6 @@ with st.sidebar:
         
         if st.form_submit_button("บันทึกเควสใหม่"):
             if new_name:
-                # แก้ไข: ส่ง current_player ไปด้วย
                 try:
                     requests.get(f"{API_URL}?action=add_quest&player={current_player}&name={new_name}&exp={new_exp}&unit={new_unit}")
                     st.toast("เพิ่มเควสเรียบร้อยแล้ว!")
@@ -86,19 +85,22 @@ progress = min(st.session_state.exp / st.session_state.max_exp, 1.0)
 st.progress(progress)
 st.markdown(f"**EXP:** {int(st.session_state.exp)} / {int(st.session_state.max_exp)} (ขาดอีก {int(st.session_state.max_exp - st.session_state.exp)} จะเลเวลอัป!)")
 
-# --- ส่วนแสดงรายการเควส ---
+# --- ส่วนแสดงรายการเควส (แก้ไขให้แสดงหน่วยและมีปุ่มลบ) ---
 st.markdown("### 📜 DAILY TASKS")
-# แก้ไข: ส่ง current_player เข้าไปดึงเควส
 quests = load_quests(current_player)
 
 if quests:
     for i, q in enumerate(quests):
-        col1, col2, col3 = st.columns([5, 2, 2], vertical_alignment="center")
+        # ปรับคอลัมน์ให้กว้างขึ้นเพื่อใส่ปุ่มลบ (เพิ่ม col4)
+        col1, col2, col3, col4 = st.columns([4, 2, 2, 1], vertical_alignment="center")
         
         with col1:
-            st.write(f"**{q['name']}** (+{q['exp_per_unit']} EXP)")
+            # แสดงชื่อเควส EXP และหน่วย
+            st.write(f"**{q['name']}** (+{q['exp_per_unit']} EXP / {q['unit']})")
+        
         with col2:
             count = st.number_input(f" ", min_value=0, key=f"input_{i}", label_visibility="collapsed")
+            
         with col3:
             if st.button("COMPLETE", key=f"btn_{i}"):
                 if count > 0:
@@ -111,7 +113,14 @@ if quests:
                         st.session_state.max_exp = 100 * (1.5 ** (st.session_state.level - 1))
                     
                     save_player_data(current_player, st.session_state.level, st.session_state.exp)
-                    st.toast(f"ได้รับ {gained} EXP! 🔥")
+                    st.toast(f"ได้รับ {gained} EXP!")
                     st.rerun()
+
+        with col4:
+            # ปุ่มลบเควส
+            if st.button("🗑️", key=f"del_{i}"):
+                requests.get(f"{API_URL}?action=delete_quest&player={current_player}&name={q['name']}")
+                st.toast(f"ลบเควส {q['name']} แล้ว")
+                st.rerun()
 else:
     st.info(f"ไม่พบเควสสำหรับ {current_player} เพิ่มเควสจากแถบด้านข้างได้เลยครับ!")
