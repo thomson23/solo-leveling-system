@@ -85,17 +85,21 @@ progress = min(st.session_state.exp / st.session_state.max_exp, 1.0)
 st.progress(progress)
 st.markdown(f"**EXP:** {int(st.session_state.exp)} / {int(st.session_state.max_exp)} (ขาดอีก {int(st.session_state.max_exp - st.session_state.exp)} จะเลเวลอัป!)")
 
-# --- ส่วนแสดงรายการเควส ---
+# --- ส่วนแสดงรายการเควส (ที่ปรับปรุงการจัดตำแหน่ง) ---
 st.markdown("### 📜 DAILY TASKS")
 quests = load_quests()
 
 if quests:
     for i, q in enumerate(quests):
-        col1, col2, col3 = st.columns([2, 1, 1])
+        # ใช้ vertical_alignment="center" เพื่อให้ชื่อเควสและปุ่มอยู่แนวเดียวกัน
+        col1, col2, col3 = st.columns([5, 2, 2], vertical_alignment="center")
+        
         with col1:
             st.write(f"**{q['name']}** (+{q['exp_per_unit']} EXP)")
+        
         with col2:
-            count = st.number_input(f"จำนวน", min_value=0, key=f"input_{i}")
+            count = st.number_input(f" ", min_value=0, key=f"input_{i}", label_visibility="collapsed")
+            
         with col3:
             if st.button("COMPLETE", key=f"btn_{i}"):
                 if count > 0:
