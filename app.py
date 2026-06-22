@@ -50,6 +50,24 @@ with st.sidebar:
                 st.session_state.players[idx] = new_name
                 st.rerun()
 
+    st.markdown("---")
+    st.markdown("### ➕ ADD CUSTOM QUEST")
+    with st.form("add_quest_form", clear_on_submit=True):
+        new_name = st.text_input("ชื่อเควส")
+        new_exp = st.number_input("EXP ต่อหน่วย", min_value=1, value=10)
+        new_unit = st.text_input("หน่วย (เช่น ครั้ง, นาที)", value="ครั้ง")
+        
+        if st.form_submit_button("บันทึกเควสใหม่"):
+            if new_name:
+                try:
+                    requests.get(f"{API_URL}?action=add_quest&name={new_name}&exp={new_exp}&unit={new_unit}")
+                    st.toast("เพิ่มเควสเรียบร้อยแล้ว!")
+                    st.rerun() 
+                except:
+                    st.error("เกิดข้อผิดพลาดในการเชื่อมต่อ")
+            else:
+                st.warning("กรุณากรอกชื่อเควส")
+
 # --- ซิงค์ข้อมูล ---
 if 'current_active' not in st.session_state or st.session_state.current_active != current_player:
     st.session_state.current_active = current_player
@@ -67,7 +85,7 @@ progress = min(st.session_state.exp / st.session_state.max_exp, 1.0)
 st.progress(progress)
 st.markdown(f"**EXP:** {int(st.session_state.exp)} / {int(st.session_state.max_exp)} (ขาดอีก {int(st.session_state.max_exp - st.session_state.exp)} จะเลเวลอัป!)")
 
-# --- ส่วนแสดงรายการเควส (รวมมาให้แล้ว) ---
+# --- ส่วนแสดงรายการเควส ---
 st.markdown("### 📜 DAILY TASKS")
 quests = load_quests()
 
@@ -84,7 +102,7 @@ if quests:
                     gained = count * int(q['exp_per_unit'])
                     st.session_state.exp += gained
                     
-                    # ตรรกะเลเวลอัปแบบต่อเนื่อง (กรณีได้ EXP เยอะจนอัปหลายเลเวล)
+                    # ตรรกะเลเวลอัปแบบต่อเนื่อง
                     while st.session_state.exp >= st.session_state.max_exp:
                         st.session_state.exp -= st.session_state.max_exp
                         st.session_state.level += 1
