@@ -4,7 +4,7 @@ import requests
 # ตั้งค่าหน้าจอธีมระบบ
 st.set_page_config(page_title="Solo Leveling System", page_icon="⚔️", layout="centered")
 
-# --- โค้ดปรับแต่งดีไซน์ใหม่ (Bulletproof Solo Leveling Style) ---
+# --- โค้ดปรับแต่งดีไซน์ (Bulletproof Solo Leveling Style) ---
 st.markdown("""
 <style>
     /* พื้นหลังแอปสีดำสนิทแนวสมาร์ทโฟนของระบบ */
@@ -14,7 +14,7 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
     
-    /* ปรับแต่ง Main Container หลักให้กลายเป็นหน้าต่างเควสเรืองแสงโดยตรง (แก้บั๊กหน้าจอหาย) */
+    /* ปรับแต่ง Main Container หลักให้กลายเป็นหน้าต่างเควสเรืองแสงโดยตรง */
     div[data-testid="stMainBlockContainer"] {
         background: rgba(10, 16, 32, 0.85);
         border: 2px solid #00f2ff;
@@ -122,6 +122,10 @@ def save_player_data(player_name, level, exp):
     except:
         pass
 
+# --- ระบบตั้งค่ารายชื่อปาร์ตี้เริ่มต้น ---
+if 'players' not in st.session_state:
+    st.session_state.players = ["หมั่น", "บีม", "ผู้เล่น 3", "ผู้เล่น 4"]
+
 # --- ระบบคลังเควส (Default Quests) ---
 if 'quests' not in st.session_state:
     st.session_state.quests = [
@@ -134,11 +138,28 @@ if 'quests' not in st.session_state:
 # --- แถบสไลด์บาร์ด้านข้าง (Party System & Quest Creator) ---
 with st.sidebar:
     st.markdown("### 👥 PARTY SYSTEM")
+    # ดึงรายชื่อผู้เล่นจากตัวแปร State ล่าสุดมาแสดงผล
     current_player = st.selectbox(
         "SELECT ACTIVE PLAYER",
-        ["หมั่น", "บีม"]
+        st.session_state.players
     )
     st.caption("ระบบจะสลับและบันทึกข้อมูลแยกโปรไฟล์อัตโนมัติ")
+    
+    # ฟีเจอร์ใหม่: หน้าต่างกางออกสำหรับแก้ไขชื่อผู้เล่นในปาร์ตี้
+    with st.expander("📝 EDIT PLAYER NAMES"):
+        with st.form("edit_player_names_form"):
+            updated_names = []
+            for idx, name in enumerate(st.session_state.players):
+                new_name = st.text_input(f"Slot {idx+1}", value=name, key=f"player_slot_{idx}")
+                # ถ้าผู้เล่นลบจนเป็นช่องว่าง ให้ใส่ชื่อ Slot กำกับไว้กันบั๊ก
+                updated_names.append(new_name.strip() if new_name.strip() else f"ผู้เล่น {idx+1}")
+            
+            save_names_btn = st.form_submit_button("💾 SAVE CHANGES")
+            if save_names_btn:
+                st.session_state.players = updated_names
+                st.toast("อัปเดตรายชื่อผู้เล่นในระบบสำเร็จ! ⚔️")
+                st.rerun()
+                
     st.markdown("---")
     
     # ฟีเจอร์เพิ่มเควสเอง
