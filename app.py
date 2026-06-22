@@ -67,22 +67,31 @@ progress = min(st.session_state.exp / st.session_state.max_exp, 1.0)
 st.progress(progress)
 st.markdown(f"**EXP:** {int(st.session_state.exp)} / {int(st.session_state.max_exp)} (ขาดอีก {int(st.session_state.max_exp - st.session_state.exp)} จะเลเวลอัป!)")
 
-# --- ลูปแสดงรายการเควส ---
+# --- ส่วนแสดงรายการเควส (รวมมาให้แล้ว) ---
 st.markdown("### 📜 DAILY TASKS")
 quests = load_quests()
-for i, q in enumerate(quests):
-    col1, col2, col3 = st.columns([2, 1, 1])
-    with col1:
-        st.write(f"**{q['name']}** (+{q['exp_per_unit']} EXP)")
-    with col2:
-        count = st.number_input(f"จำนวน", min_value=0, key=f"input_{i}")
-    with col3:
-        if st.button("COMPLETE", key=f"btn_{i}"):
-            gained = count * q['exp_per_unit']
-            st.session_state.exp += gained
-            # ถ้า EXP เกิน จะเพิ่มเลเวล (ตรรกะง่ายๆ)
-            if st.session_state.exp >= st.session_state.max_exp:
-                st.session_state.level += 1
-                st.session_state.exp = 0
-            save_player_data(current_player, st.session_state.level, st.session_state.exp)
-            st.rerun()
+
+if quests:
+    for i, q in enumerate(quests):
+        col1, col2, col3 = st.columns([2, 1, 1])
+        with col1:
+            st.write(f"**{q['name']}** (+{q['exp_per_unit']} EXP)")
+        with col2:
+            count = st.number_input(f"จำนวน", min_value=0, key=f"input_{i}")
+        with col3:
+            if st.button("COMPLETE", key=f"btn_{i}"):
+                if count > 0:
+                    gained = count * int(q['exp_per_unit'])
+                    st.session_state.exp += gained
+                    
+                    # ตรรกะเลเวลอัปแบบต่อเนื่อง (กรณีได้ EXP เยอะจนอัปหลายเลเวล)
+                    while st.session_state.exp >= st.session_state.max_exp:
+                        st.session_state.exp -= st.session_state.max_exp
+                        st.session_state.level += 1
+                        st.session_state.max_exp = 100 * (1.5 ** (st.session_state.level - 1))
+                    
+                    save_player_data(current_player, st.session_state.level, st.session_state.exp)
+                    st.toast(f"ได้รับ {gained} EXP! 🔥")
+                    st.rerun()
+else:
+    st.info("ไม่พบเควสในระบบ หรือกำลังโหลดข้อมูล...")
