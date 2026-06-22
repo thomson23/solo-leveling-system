@@ -1,105 +1,155 @@
 import streamlit as st
-import gspread
 import pandas as pd
+from streamlit_gsheets import GSheetsConnection
 
-# ตั้งค่าหน้าจอแอป ให้ฟีล Dark Mode แบบระบบในเรื่อง
+# 1. การตั้งค่าธีมและสไตล์ (Glassmorphism & Neon)
 st.set_page_config(page_title="Solo Leveling System", page_icon="⚔️", layout="centered")
 
-# ฟังก์ชันโหลดข้อมูลจาก Google Sheets (เข้าถึงแบบสาธารณะผ่านลิงก์แชร์)
-@st.cache_data(ttl=0) # อัปเดตค่าใหม่ตลอด ไม่จำค่าเก่าค้าง
-def load_data_from_sheets(sheet_url):
+# CSS สำหรับ UI โปร่งแสงและตัวหนังสือขนาดใหญ่
+st.markdown("""
+<style>
+    /* พื้นหลังและโทนสีหลัก */
+    .stApp {
+        background-color: #0e1117;
+        color: #ffffff;
+    }
+    
+    /* กรอบเควสแบบโปร่งแสง (Glassmorphism) */
+    div[data-testid="stVerticalBlock"] > div.element-container {
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 15px;
+        border: 1px solid rgba(0, 242, 255, 0.2);
+    }
+
+    /* ปรับขนาดตัวหนังสือเควสให้ใหญ่ (Mobile Friendly) */
+    .quest-title {
+        font-size: 28px !important;
+        font-weight: bold;
+        color: #00f2ff;
+        text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+        margin-bottom: 5px;
+    }
+    .quest-caption {
+        font-size: 18px !important;
+        color: #aaaaaa;
+    }
+
+    /* ปรับแต่งปุ่มกดให้ดูเหมือนปุ่มระบบ */
+    .stButton > button {
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid #00f2ff;
+        background: rgba(0, 242, 255, 0.1);
+        color: white;
+        font-size: 20px !important;
+        height: 55px;
+        transition: 0.3s;
+    }
+    .stButton > button:hover {
+        background: #00f2ff;
+        color: black;
+        box-shadow: 0 0 20px #00f2ff;
+    }
+
+    /* ปรับแต่งปุ่ม Reset ให้สีแดงเด่นชัด */
+    .reset-btn button {
+        background-color: rgba(255, 75, 75, 0.2) !important;
+        border: 1px solid #ff4b4b !important;
+        color: #ff4b4b !important;
+        font-size: 16px !important;
+        height: 45px !important;
+    }
+
+    /* ปรับระดับ Level ให้ใหญ่ */
+    div[data-testid="stMetricValue"] {
+        font-size: 60px !important;
+        color: #00f2ff !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# 2. เชื่อมต่อ Google Sheets
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+def load_data():
     try:
-        # เปิดอ่านข้อมูลจากลิงก์โดยตรง
-        gc = gspread.oauth() # เปิดใช้งานเบื้องต้น
+        df = conn.read(worksheet="save_state", ttl=0)
+        return dict(zip(df['key'], df['value']))
     except:
-        # หากยังไม่ได้ตั้งค่าเซฟแบบยืนยันตัวตน ให้ใช้วิธีอ่านค่าผ่านตารางเปิดสาธารณะแทน
-        try:
-            csv_url = sheet_url.replace('/edit?usp=sharing', '/gviz/tq?tqx=out:csv&sheet=save_state')
-            df = pd.read_csv(csv_url)
-            data_dict = dict(zip(df['key'], df['value']))
-            return data_dict
-        except:
-            return None
+        return {"level": 1, "exp": 0}
 
-# ดึงลิงก์แชร์จาก secrets.toml
-try:
-    SHEET_URL = st.secrets["connections"]["gsheets"]["spreadsheet"]
-except:
-    SHEET_URL = ""
+def save_data(level, exp):
+    save_df = pd.DataFrame([{"key": "level", "value": int(level)}, {"key": "exp", "value": int(exp)}])
+    conn.update(worksheet="save_state", data=save_df)
 
-# --- โหลดเซฟเมื่อเปิดแอปครั้งแรก ---
+# 3. เริ่มต้นระบบ Logic
 if 'level' not in st.session_state:
-    sheets_data = load_data_from_sheets(SHEET_URL)
-    
-    if sheets_data and 'level' in sheets_data:
-        st.session_state.level = int(sheets_data['level'])
-        st.session_state.exp = int(sheets_data['exp'])
-    else:
-        st.session_state.level = 1
-        st.session_state.exp = 0
-        
-    st.session_state.max_exp = 100
+    data = load_data()
+    st.session_state.level = int(data.get("level", 1))
+    st.session_state.exp = int(data.get("exp", 0))
+    st.session_state.max_exp = 100 * (1.5 ** (st.session_state.level - 1))
     st.session_state.stats = {"STR": 10, "VIT": 10, "AGI": 10, "INT": 10, "MND": 10}
-    st.session_state.history = []
 
-# ฟังก์ชันคำนวณแต้มเมื่อส่งเควส
-def add_reward(stat_name, final_stat_val, final_exp_reward, activity_name, count, unit):
-    st.session_state.exp += final_exp_reward
-    st.session_state.stats[stat_name] += final_stat_val
-    st.session_state.stats[stat_name] = round(st.session_state.stats[stat_name], 1)
-    
-    # ระบบ Level Up
-    leveled_up = False
+def add_reward(stat_name, stat_val, exp_reward):
+    st.session_state.exp += exp_reward
     while st.session_state.exp >= st.session_state.max_exp:
         st.session_state.exp -= st.session_state.max_exp
         st.session_state.level += 1
-        leveled_up = True
-        
-    st.session_state.history.append(
-        f"สำเร็จเควส: {activity_name} {count} {unit} (+{final_exp_reward} EXP)"
-    )
-    return leveled_up
+        st.session_state.max_exp *= 1.5
+    save_data(st.session_state.level, st.session_state.exp)
 
-# --- หน้าตา UI ของแอป ---
-st.title("🚨 โหมดผู้ปลุกพลัง (Awakened System)")
-st.subheader("ผู้เล่น: สอง (เซฟข้อมูลออนไลน์ผ่าน Google Sheets)")
-st.markdown("---")
+# --- หน้าตา UI ---
+st.markdown("<h1 style='text-align: center; color: #00f2ff;'>SYSTEM : SOLO LEVELING</h1>", unsafe_allow_html=True)
 
-col1, col2 = st.columns([1, 2])
+col1, col2 = st.columns([1, 1])
 with col1:
-    st.metric(label="LEVEL", value=st.session_state.level)
-    progress = min(st.session_state.exp / st.session_state.max_exp, 1.0)
-    st.progress(progress)
-    st.caption(f"EXP: {int(st.session_state.exp)} / {st.session_state.max_exp}")
-
+    st.metric(label="PLAYER LEVEL", value=st.session_state.level)
 with col2:
-    st.markdown("### **[ สเตตัสของคุณ ]**")
-    for stat, val in st.session_state.stats.items():
-        st.text(f"🔹 {stat} : {val}")
+    progress = min(st.session_state.exp / st.session_state.max_exp, 1.0)
+    st.write(f"### EXP: {int(st.session_state.exp)} / {int(st.session_state.max_exp)}")
+    st.progress(progress)
 
 st.markdown("---")
-st.markdown("### 📋 เควสประจำวัน")
 
+# รายการเควส
 quests = [
-    {"name": "🏋️ วิดพื้น", "unit": "ครั้ง", "stat": "STR", "stat_val": 0.2, "exp": 1.5},
-    {"name": "🏃 วิ่ง", "unit": "กิโลเมตร", "stat": "AGI", "stat_val": 2.0, "exp": 30.0},
-    {"name": "📚 อ่านหนังสือ", "unit": "หน้า", "stat": "INT", "stat_val": 0.2, "exp": 4.0},
-    {"name": "🧘 นั่งสมาธิ", "unit": "นาที", "stat": "MND", "stat_val": 0.2, "exp": 1.5}
+    {"name": "🏋️ Push-Ups (วิดพื้น)", "unit": "ครั้ง", "stat": "STR", "val": 0.2, "exp": 2},
+    {"name": "🏃 Running (วิ่ง)", "unit": "km", "stat": "AGI", "val": 5.0, "exp": 50},
+    {"name": "📚 Reading (อ่านหนังสือ)", "unit": "หน้า", "stat": "INT", "val": 0.5, "exp": 5},
 ]
 
-for index, quest in enumerate(quests):
+st.markdown("### [ Daily Quests ]")
+
+for i, q in enumerate(quests):
     with st.container():
-        col_name, col_input, col_btn = st.columns([2, 1, 1])
-        with col_name:
-            st.markdown(f"**{quest['name']}**")
-            st.caption(f"1 {quest['unit']} = +{quest['stat_val']} {quest['stat']} | +{quest['exp']} EXP")
-        with col_input:
-            count = st.number_input(f"จำนวน ({quest['unit']})", min_value=1, value=10, key=f"in_{index}", label_visibility="collapsed")
-        with col_btn:
-            calculated_stat = round(quest['stat_val'] * count, 1)
-            calculated_exp = int(quest['exp'] * count)
-            if st.button(f"ส่งเควส (+{calculated_exp} XP)", key=f"btn_{index}", use_container_width=True):
-                lv_up = add_reward(quest['stat'], calculated_stat, calculated_exp, quest['name'], count, quest['unit'])
-                st.success("อัปเดตข้อมูลสำเร็จ!")
-                if lv_up: st.balloons()
+        # แสดงหัวข้อเควสขนาดใหญ่
+        st.markdown(f"<div class='quest-title'>{q['name']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='quest-caption'>1 {q['unit']} = +{q['val']} {q['stat']} | +{q['exp']} EXP</div>", unsafe_allow_html=True)
+        
+        col_in, col_bt = st.columns([1, 1])
+        with col_in:
+            count = st.number_input(f"จำนวน", min_value=1, value=10, key=f"num_{i}")
+        with col_bt:
+            exp_gain = int(q['exp'] * count)
+            st.write("") # เว้นระยะให้ปุ่มตรงกับช่องกรอก
+            if st.button(f"COMPLETE (+{exp_gain} XP)", key=f"btn_{i}"):
+                add_reward(q['stat'], q['val'] * count, exp_gain)
+                st.success("SYNCING WITH SYSTEM...")
                 st.rerun()
+    st.write("") # ระยะห่างระหว่างเควส
+
+# Sidebar สำหรับปุ่มรีเซ็ตที่หายไป
+with st.sidebar:
+    st.markdown("## SYSTEM SETTINGS")
+    st.write("จัดการข้อมูลเลเวลของคุณ")
+    
+    # วางปุ่มรีเซ็ตเลเวลไว้ในคลาสพิเศษเพื่อให้สีแดง
+    st.markdown('<div class="reset-btn">', unsafe_allow_html=True)
+    if st.button("🚨 RESET LEVEL (เริ่มใหม่)", key="reset_all"):
+        save_data(1, 0)
+        st.session_state.clear()
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown("---")
+    st.caption("Solo Leveling System v2.0 - Glass Edition")
