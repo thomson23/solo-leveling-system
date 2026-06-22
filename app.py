@@ -4,7 +4,7 @@ import requests
 # ตั้งค่าหน้าจอธีมระบบ
 st.set_page_config(page_title="Solo Leveling System", page_icon="⚔️", layout="centered")
 
-# --- โค้ดปรับแต่งดีไซน์ (Solo Leveling System Style) ---
+# --- โค้ดปรับแต่งดีไซน์ใหม่ (Bulletproof Solo Leveling Style) ---
 st.markdown("""
 <style>
     /* พื้นหลังแอปสีดำสนิทแนวสมาร์ทโฟนของระบบ */
@@ -14,14 +14,14 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
     
-    /* กล่องหน้าต่างเควสเรืองแสง (Quest Info Box) */
-    .system-quest-container {
+    /* ปรับแต่ง Main Container หลักให้กลายเป็นหน้าต่างเควสเรืองแสงโดยตรง (แก้บั๊กหน้าจอหาย) */
+    div[data-testid="stMainBlockContainer"] {
         background: rgba(10, 16, 32, 0.85);
         border: 2px solid #00f2ff;
         border-radius: 12px;
-        padding: 25px;
+        padding: 30px !important;
         box-shadow: 0 0 25px rgba(0, 242, 255, 0.25);
-        margin-bottom: 20px;
+        margin-top: 20px;
     }
     
     /* หัวข้อ DAILY TASKS */
@@ -66,7 +66,7 @@ st.markdown("""
         text-align: center;
         font-weight: bold;
         text-shadow: 0 0 8px rgba(255, 59, 48, 0.4);
-        margin-top: 25px;
+        margin-top: 35px;
     }
     
     /* สไตล์ปุ่มกด Complete เควส */
@@ -134,7 +134,6 @@ if 'quests' not in st.session_state:
 # --- แถบสไลด์บาร์ด้านข้าง (Party System & Quest Creator) ---
 with st.sidebar:
     st.markdown("### 👥 PARTY SYSTEM")
-    # อัปเดตรายชื่อผู้เล่นเป็น หมั่น และ บีม ตรงนี้เรียบร้อยครับ
     current_player = st.selectbox(
         "SELECT ACTIVE PLAYER",
         ["หมั่น", "บีม"]
@@ -142,7 +141,7 @@ with st.sidebar:
     st.caption("ระบบจะสลับและบันทึกข้อมูลแยกโปรไฟล์อัตโนมัติ")
     st.markdown("---")
     
-    # ฟีเจอร์เพิ่มเควสเองได้ตามต้องการ สั่งเพิ่ม EXP ต่อหน่วยได้เอง
+    # ฟีเจอร์เพิ่มเควสเอง
     st.markdown("### ➕ ADD CUSTOM QUEST")
     with st.form("add_quest_form", clear_on_submit=True):
         new_quest_name = st.text_input("ชื่อเควส (เช่น 🥤 ดื่มน้ำ, ⌨️ เขียนโค้ด)")
@@ -187,4 +186,39 @@ progress_ratio = min(st.session_state.exp / st.session_state.max_exp, 1.0)
 st.progress(progress_ratio)
 st.markdown(f"<p style='text-align: right; font-size:12px; color:#8da4be; margin-top:-10px;'>EXP: {int(st.session_state.exp)} / {int(st.session_state.max_exp)}</p>", unsafe_allow_html=True)
 
-# โครง
+# โครงสร้างเนื้อหาด้านในระบบ (DAILY TASKS WINDOW)
+st.markdown('<div class="system-title">DAILY TASKS</div>', unsafe_allow_html=True)
+st.markdown('<div class="system-subtitle">CHALLENGE YOUR LIMITS TO GROW</div>', unsafe_allow_html=True)
+st.markdown('<div class="info-header">ℹ️ QUEST INFO (MULTIPLIER SYSTEM)</div>', unsafe_allow_html=True)
+
+# ลูปแสดงรายการเควสทั้งหมด
+for i, q in enumerate(st.session_state.quests):
+    col_q_text, col_q_input, col_q_btn = st.columns([2.2, 1.3, 1.2])
+    
+    with col_q_text:
+        st.markdown(f"""
+        <div style='margin-top: 25px;'>
+            <p style='font-size:16px; font-weight:bold; margin-bottom:2px;'>{q['name']}</p>
+            <p style='color:#00f2ff; font-size:12px; margin:0;'>+{q['exp_per_unit']} XP / {q['unit']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col_q_input:
+        count = st.number_input(f"จำนวน ({q['unit']})", min_value=0, value=0, step=1, key=f"input_{i}")
+        
+    with col_q_btn:
+        if st.button("COMPLETE", key=f"btn_{i}"):
+            if count > 0:
+                gained_exp = count * q['exp_per_unit']
+                add_reward(gained_exp)
+                st.toast(f"Quest Complete! ทำไป {count} {q['unit']} ได้รับ {gained_exp} EXP 🔥")
+                st.rerun()
+            else:
+                st.toast("กรุณาใส่จำนวนก่อนกดปุ่มด้วยครับ!", icon="⚠️")
+
+# ข้อความแจ้งเตือนบทลงโทษท้ายหน้าต่างเควส
+st.markdown("""
+<div class="penalty-warning">
+    ⚠️ WARNING: FAILURE TO COMPLETE THE DAILY QUEST WILL RESULT IN AN APPROPRIATE PENALTY.
+</div>
+""", unsafe_allow_html=True)
